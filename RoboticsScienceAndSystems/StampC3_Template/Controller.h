@@ -76,17 +76,6 @@ class Controller_c {
      */
     void update(Robot_c &robot, RobotWifiAP_c &server);
 
-    /**
-     * @brief Exercise 1: stops the motors and prints the five raw surface
-     * reflectance discharge times as one CSV line per controller cycle.
-     * @param robot Hardware-facing interface holding the cached snapshot.
-     * @param now Current controller time in milliseconds (unused here).
-     * @note Format is DN1,DN2,DN3,DN4,DN5 with no header, suitable for the
-     * Serial Monitor or Serial Plotter. Values are microseconds and shorter
-     * times mean stronger reflected IR.
-     */
-    void sensorTest(Robot_c &robot, unsigned long now);
-
   private:
     /** @brief Internal modes used by the nominal line-following demonstration. */
     enum Mode {
