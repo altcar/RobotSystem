@@ -84,18 +84,39 @@ void Controller_c::update(Robot_c &robot, RobotWifiAP_c &server) {
 
   // The user has started the demonstration, so we run the line following
   // controller code.
-  if (signal == 1) {
-    runLineFollower(robot, now);
+  // Exercise 1: line following is disabled so only the sensor test runs.
+  // if (signal == 1) {
+  //   runLineFollower(robot, now);
+  //
+  // }
 
-  }
+  // Exercise 1: report the five surface sensors once per controller cycle.
+  sensorTest(robot, now);
 
   // Use another TaskTimer_c to limit how often we transmit telemetry data
   // on WiFi and Serial.
-  if (telemetry_timer.isReady(now)) {
-    telemetry_timer.resetTimer(now);
-    publishTelemetry(robot, server, now);
+  // Exercise 1: telemetry is disabled so it does not corrupt the sensor plot.
+  // if (telemetry_timer.isReady(now)) {
+  //   telemetry_timer.resetTimer(now);
+  //   publishTelemetry(robot, server, now);
+  //
+  // }
+}
 
-  }
+void Controller_c::sensorTest(Robot_c &robot, unsigned long now) {
+  (void)now;  // Not needed: the test reports every controller cycle.
+
+  // The robot must stay stationary while the surface is measured.
+  robot.setMotorPWM(0, 0);
+
+  // One CSV line per cycle: five raw discharge times in microseconds.
+  // Reading[] runs DN1..DN5; the plotter needs numbers, commas and a newline.
+  Serial.printf("%u,%u,%u,%u,%u\n",
+                robot.surface.reading[0],
+                robot.surface.reading[1],
+                robot.surface.reading[2],
+                robot.surface.reading[3],
+                robot.surface.reading[4]);
 }
 
 bool Controller_c::lineDetected(const Robot_c &robot) const {
