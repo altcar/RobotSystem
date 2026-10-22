@@ -29,7 +29,7 @@ void setup() {
   
   //surface.setSize(displayWidth, displayHeight);
   //surface.setLocation(0, 0);
-  surface.setTitle("CW2026 Digital Twin");
+  surface.setTitle("CW2026 Digital Twin - Image Rastering");
   simulator = new Simulator(this, SURFACE_OFFSET_X_MM, SURFACE_OFFSET_Y_MM);
   
 }

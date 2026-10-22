@@ -30,6 +30,9 @@ class OdometryModel_c {
     mmPerEncoderCount = TWO_PI * wheelRadiusMm / encoderCountsPerRevolution;
   }
 
+  /** @return Millimetres of wheel travel represented by one encoder count. */
+  float getMmPerEncoderCount() { return mmPerEncoderCount; }
+
   /** @brief Sets the complete pose and encoder state for a new run. */
   void reset(float x, float y, float theta, float leftEncoder,
     float rightEncoder) {

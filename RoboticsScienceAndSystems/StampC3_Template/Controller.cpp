@@ -1,4 +1,6 @@
 #include "Controller.h"
+#include <stdio.h>
+#include <string.h>
 
 const unsigned long Controller_c::UPDATE_INTERVAL_MS;
 const unsigned long Controller_c::TELEMETRY_INTERVAL_MS;
@@ -12,6 +14,12 @@ constexpr float Controller_c::RECOVERY_RIGHT_PWM;
 Controller_c::Controller_c()
   : update_timer(UPDATE_INTERVAL_MS),
     telemetry_timer(TELEMETRY_INTERVAL_MS) {
+  hil_enabled = false;
+  hil_left_pwm = 0.0f;
+  hil_right_pwm = 0.0f;
+  hil_last_command_ms = 0;
+  hil_line[0] = '\0';
+  hil_line_length = 0;
   reset();
 }
 
@@ -60,6 +68,13 @@ void Controller_c::update(Robot_c &robot, RobotWifiAP_c &server) {
   // begins counting again.  We now run the remaining controller code.
   update_timer.resetTimer(now);
 
+  // Hardware-in-the-loop takes priority: the computer supplies the PWM and
+  // the firmware only maintains the robot snapshot and telemetry.
+  if (hil_enabled) {
+    runHil(robot, server, now);
+    return;
+  }
+
   // Ask the robot for latest information on surface reflectance sensors.
   robot.getSurfaceSensors();
 
@@ -101,6 +116,77 @@ void Controller_c::update(Robot_c &robot, RobotWifiAP_c &server) {
   //   publishTelemetry(robot, server, now);
   //
   // }
+}
+
+void Controller_c::pollHil(RobotWifiAP_c &server) {
+  while (server.available() > 0) {
+    int c = server.read();
+    if (c < 0) {
+      break;
+    }
+    if (c == '\n' || c == '\r') {
+      if (hil_line_length > 0) {
+        hil_line[hil_line_length] = '\0';
+        parseHilLine(hil_line);
+        hil_line_length = 0;
+      }
+    } else if (hil_line_length < sizeof(hil_line) - 1) {
+      hil_line[hil_line_length++] = (char)c;
+    } else {
+      hil_line_length = 0; // discard an overlong line
+    }
+  }
+}
+
+void Controller_c::parseHilLine(char* line) {
+  if (strcmp(line, "HIL,1") == 0) {
+    hil_enabled = true;
+    hil_left_pwm = 0.0f;
+    hil_right_pwm = 0.0f;
+    hil_last_command_ms = millis();
+    signal = 2; // telemetry marker while the computer owns the motors
+  } else if (strcmp(line, "HIL,0") == 0) {
+    hil_enabled = false;
+    hil_left_pwm = 0.0f;
+    hil_right_pwm = 0.0f;
+    signal = 0;
+  } else if (strncmp(line, "PWM,", 4) == 0) {
+    float left = 0.0f;
+    float right = 0.0f;
+    if (hil_enabled && sscanf(line, "PWM,%f,%f", &left, &right) == 2) {
+      hil_left_pwm = constrain(left, -200.0f, 200.0f);
+      hil_right_pwm = constrain(right, -200.0f, 200.0f);
+      hil_last_command_ms = millis();
+    }
+  } else if (strcmp(line, "STOP") == 0) {
+    hil_left_pwm = 0.0f;
+    hil_right_pwm = 0.0f;
+    hil_last_command_ms = millis();
+  }
+}
+
+bool Controller_c::isHilEnabled() const {
+  return hil_enabled;
+}
+
+void Controller_c::runHil(Robot_c &robot, RobotWifiAP_c &server, unsigned long now) {
+  robot.getSurfaceSensors();
+  if (robot.getEncoders()) {
+    odometry.update(robot.getLeftEncoderCount(), robot.getRightEncoderCount());
+  }
+  robot.getPose();
+
+  // Safety: a lost PC connection must not leave the previous command applied.
+  if (now - hil_last_command_ms > 500) {
+    hil_left_pwm = 0.0f;
+    hil_right_pwm = 0.0f;
+  }
+  robot.setMotorPWM(hil_left_pwm, hil_right_pwm);
+
+  if (telemetry_timer.isReady(now)) {
+    telemetry_timer.resetTimer(now);
+    publishTelemetry(robot, server, now);
+  }
 }
 
 void Controller_c::sensorTest(Robot_c &robot, unsigned long now) {

@@ -77,6 +77,18 @@ class Controller_c {
     void update(Robot_c &robot, RobotWifiAP_c &server);
 
     /**
+     * @brief Reads and applies HIL commands from the active TCP client.
+     * @param server Telemetry transport; commands are newline terminated.
+     * @note Call every loop(). Commands are HIL,1 (enable), HIL,0 (disable),
+     * PWM,left,right, and STOP. Commands are ignored unless HIL is enabled.
+     * A 500 ms command timeout stops the motors.
+     */
+    void pollHil(RobotWifiAP_c &server);
+
+    /** @brief Returns whether computer (HIL) control is active. */
+    bool isHilEnabled() const;
+
+    /**
      * @brief Exercise 1: stops the motors and prints the five raw surface
      * reflectance discharge times as one CSV line per controller cycle.
      * @param robot Hardware-facing interface holding the cached snapshot.
@@ -101,6 +113,20 @@ class Controller_c {
     TaskTimer_c update_timer;
     TaskTimer_c telemetry_timer;
     unsigned long recovery_start_ms;
+
+    /** @brief HIL computer-control state. */
+    bool hil_enabled;
+    float hil_left_pwm;
+    float hil_right_pwm;
+    unsigned long hil_last_command_ms;
+    char hil_line[64];
+    size_t hil_line_length;
+
+    /** @brief Applies the newest HIL command with a safety timeout. */
+    void runHil(Robot_c &robot, RobotWifiAP_c &server, unsigned long now);
+
+    /** @brief Parses one complete command line without using dynamic memory. */
+    void parseHilLine(char* line);
 
     /** @brief Returns whether cached DN3 is at or above LINE_THRESHOLD. */
     bool lineDetected(const Robot_c &robot) const;
